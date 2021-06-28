@@ -5,6 +5,12 @@ import pandas as pd
 OPTIMAL_AIR_FUEL_RATIO = 14.7
 OCTANE_MOLAR_MASS = 114.23
 AIR_MOLAR_MASS = 28.97
+AIR_C = 1003.5
+NITROGEN_MOLAR_MASS = 28.02
+NITROGEN_C = 1040
+CO2_MOLAR_MASS = 44.01
+CO2_C = 8490
+
 ENTHALPY_COMBUSTION_OCTANE = 5430000
 CV_CO2 = 28.46
 CV_N2 = 20.8
@@ -61,6 +67,8 @@ def four_stroke(p1, t1, rps, speed, cool_temp):
         return [t1, p1]
     time_diff = 1.0 / rps
 
+    engine_temp = t1
+
     gamma = 7.0 / 5.0
     # geometric parameters
     bore = 0.067
@@ -95,6 +103,7 @@ def four_stroke(p1, t1, rps, speed, cool_temp):
     #temp_cooled_12 = delta_t21 * math.exp(-time_diff / (2 * tau))
     #t2 -= temp_cooled_12
     t2 = cool_temp + (t21 - cool_temp) * math.exp(-time_diff / (2*tau))
+    
 
     p2n2 = n_n2 * R * t2 / (v2 - n_n2 * b) - a * n_n2 ** 2 / (v2 ** 2)
     p2o2 = n_o2 * R * t2 / (v2 - n_o2 * bo2) - ao2 * n_o2 ** 2 / (v2 ** 2)

@@ -91,9 +91,10 @@ def four_stroke(p1, t1, rps, speed, cool_temp):
     hc = 10
     sa = 2 * math.pi / 4 * bore ** 2 * math.pi * bore * stroke / 2
     tau = ENGINE_MASS * ENGINE_HEAT_CAPACITY / (hc * sa)
-    delta_t21 = t21 - cool_temp
-    temp_cooled_12 = delta_t21 * math.exp(-time_diff / (2 * tau))
-    t2 -= temp_cooled_12
+    #delta_t21 = t21 - cool_temp
+    #temp_cooled_12 = delta_t21 * math.exp(-time_diff / (2 * tau))
+    #t2 -= temp_cooled_12
+    t2 = cool_temp + (t21 - cool_temp) * math.exp(-time_diff / (2*tau))
 
     p2n2 = n_n2 * R * t2 / (v2 - n_n2 * b) - a * n_n2 ** 2 / (v2 ** 2)
     p2o2 = n_o2 * R * t2 / (v2 - n_o2 * bo2) - ao2 * n_o2 ** 2 / (v2 ** 2)
@@ -147,14 +148,19 @@ def four_stroke(p1, t1, rps, speed, cool_temp):
     t4 = (t4n * num_moles_n2 + t4c * num_moles_co2) / (num_moles_n2 + num_moles_co2)
 
     # temperature lost due to cooling using Newton's law of cooling
-    t43 = (t4 + t3) / 2
-    delta_t43 = t43 - cool_temp
-    temp_cooled_43 = delta_t43 * math.exp(-time_diff / (2 * tau))
-    t4 -= temp_cooled_43
+    t43 = (t4+t3)/2
+    #delta_t43 = t43 - cool_temp
+    #temp_cooled_43 = delta_t43 * math.exp(-time_diff / (2 * tau))
+    #t4 -= temp_cooled_43
+    t4c = cool_temp + (t43 - cool_temp)*math.exp(-time_diff/(2*tau))
+    temp_cooled = t43-t4c
+    t4 -= temp_cooled
 
-    delta_tf = t4 - cool_temp
-    temp_cooled_f = delta_tf * math.exp(-time_diff / tau)
-    tf = t4 - temp_cooled_f
+    #delta_tf = t4 - cool_temp
+    #temp_cooled_f = delta_tf * math.exp(-time_diff / tau)
+    #tf = t4 - temp_cooled_f
+    tf = cool_temp + (t4 - cool_temp)*math.exp(-time_diff / tau)
+
 
     p4n2 = num_moles_n2 * R * t4 / (v4 - num_moles_n2 * b) - a * num_moles_n2 * 2 / (v4 ** 2)
     p4co2 = num_moles_co2 * R * t4 / (v4 - num_moles_co2 * bco2) - aco2 * num_moles_co2 ** 2 / (v4 ** 2)

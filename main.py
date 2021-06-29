@@ -5,12 +5,7 @@ import pandas as pd
 OPTIMAL_AIR_FUEL_RATIO = 14.7
 OCTANE_MOLAR_MASS = 114.23
 AIR_MOLAR_MASS = 28.97
-AIR_C = 1003.5
-NITROGEN_MOLAR_MASS = 28.02
-NITROGEN_C = 1040
-CO2_MOLAR_MASS = 44.01
-CO2_C = 8490
-
+AIR_C = 29.19
 ENTHALPY_COMBUSTION_OCTANE = 5430000
 CV_CO2 = 28.46
 CV_N2 = 20.8
@@ -21,8 +16,11 @@ b = 0.0000387
 bco2 = 0.00004267
 bo2 = 0.00003186
 R = 8.3145
-ENGINE_MASS = 7.5
-ENGINE_HEAT_CAPACITY = 921
+ENGINE_MASS = 5
+ENGINE_HEAT_CAPACITY = 910
+ENGINE_K = 230
+ENGINE_THICKNESS = 0.02
+
 
 
 def engine_kinematics(bore, stroke, con_rod, cr, start_crank, end_crank):
@@ -82,6 +80,8 @@ def four_stroke(p1, t1, rps, speed, cool_temp):
     v1 = v_s + v_c
     v2 = v_c
 
+    sa = 2 * math.pi / 4 * bore ** 2 * math.pi * bore * stroke / 2
+
     # number of moles of air
     n = p1 * v1 / (R * t1)
 
@@ -95,16 +95,16 @@ def four_stroke(p1, t1, rps, speed, cool_temp):
 
     # temperature lost due to cooling from Newton's law of cooling
     t2 = (t2n2 * n_n2 + t2o2 * n_o2) / (n_n2 + n_o2)
+    """
     t21 = (t2 + t1) / 2
-    hc = 10
-    sa = 2 * math.pi / 4 * bore ** 2 * math.pi * bore * stroke / 2
+    hc = 100000
     tau = ENGINE_MASS * ENGINE_HEAT_CAPACITY / (hc * sa)
-    #delta_t21 = t21 - cool_temp
-    #temp_cooled_12 = delta_t21 * math.exp(-time_diff / (2 * tau))
-    #t2 -= temp_cooled_12
-    t2 = cool_temp + (t21 - cool_temp) * math.exp(-time_diff / (2*tau))
-    
-
+    t2c = cool_temp + (t21 - cool_temp) * math.exp(-time_diff / (2*tau))
+    temp_cooled_21 = t21 - t2c
+    t2 -= temp_cooled_21
+    heat_transfer_21 = temp_cooled_21 * AIR_C
+    engine_temp += heat_transfer_21 / (ENGINE_MASS * ENGINE_HEAT_CAPACITY)
+    """
     p2n2 = n_n2 * R * t2 / (v2 - n_n2 * b) - a * n_n2 ** 2 / (v2 ** 2)
     p2o2 = n_o2 * R * t2 / (v2 - n_o2 * bo2) - ao2 * n_o2 ** 2 / (v2 ** 2)
     p2 = p2n2 + p2o2
@@ -156,28 +156,23 @@ def four_stroke(p1, t1, rps, speed, cool_temp):
     t4c = t3 * ((v3 - num_moles_co2 * bco2) / (v4 - num_moles_co2 * bco2)) ** (2.0 / 5.0)
     t4 = (t4n * num_moles_n2 + t4c * num_moles_co2) / (num_moles_n2 + num_moles_co2)
 
-    # temperature lost due to cooling using Newton's law of cooling
+    """
     t43 = (t4+t3)/2
-    #delta_t43 = t43 - cool_temp
-    #temp_cooled_43 = delta_t43 * math.exp(-time_diff / (2 * tau))
-    #t4 -= temp_cooled_43
     t4c = cool_temp + (t43 - cool_temp)*math.exp(-time_diff/(2*tau))
-    temp_cooled = t43-t4c
-    t4 -= temp_cooled
+    temp_cooled_43 = t43-t4c
+    t4 -= temp_cooled_43
+    heat_transfer_43 = temp_cooled_43 * AIR_C
+    engine_temp += heat_transfer_43 / (ENGINE_MASS * ENGINE_HEAT_CAPACITY)
+    """
 
-    #delta_tf = t4 - cool_temp
-    #temp_cooled_f = delta_tf * math.exp(-time_diff / tau)
-    #tf = t4 - temp_cooled_f
-    tf = cool_temp + (t4 - cool_temp)*math.exp(-time_diff / tau)
-
+    mean_temp = ((t1 + t2)/2 * 0.5 + (t3+t3)/2 * 0.5 + (t4+t1)/2 * 0.5 + t1*0.5)/2
+    q = ENGINE_K * sa * (mean_temp-cool_temp) / ENGINE_THICKNESS
+    heat_transfer = q * time_diff * 2
+    engine_temp_f = t1 + heat_transfer / (ENGINE_HEAT_CAPACITY * ENGINE_MASS)
 
     p4n2 = num_moles_n2 * R * t4 / (v4 - num_moles_n2 * b) - a * num_moles_n2 * 2 / (v4 ** 2)
     p4co2 = num_moles_co2 * R * t4 / (v4 - num_moles_co2 * bco2) - aco2 * num_moles_co2 ** 2 / (v4 ** 2)
     p4 = p4n2 + p4co2
-
-    pfn2 = num_moles_n2 * R * tf / (v4 - num_moles_n2 * b) - a * num_moles_n2 * 2 / (v4 ** 2)
-    pfco2 = num_moles_co2 * R * tf / (v4 - num_moles_co2 * bco2) - aco2 * num_moles_co2 ** 2 / (v4 ** 2)
-    pf = pfn2 + pfco2
 
     """
     # plot
@@ -190,27 +185,27 @@ def four_stroke(p1, t1, rps, speed, cool_temp):
     plt.title('P-V Diagram for van der Waal gas Otto cycle')
     plt.show()
     """
-    return [tf, pf]
+    return [engine_temp_f, p1]
 
 
-temperature = [293]
+temperature = [323]
 pressure = [101325]
 data = pd.read_csv("track_data2.csv")
 time = data['Time (s)']
 rpm = data['RPM']
 coolant_temps = data['Coolant']
 spds = data['Speed']
+oil_temps = data['Oil']
 
 for i in range(time.size - 1):
     dt = time[i+1] - time[i]
     rps = rpm[i]/60.0
-    # print(rps)
     v = spds[i]
     ct = coolant_temps[i] + 273
-    ct = 350
     num_four_strokes = rps * dt / 2
-    for j in range(num_four_strokes.astype(int) - 1):
+    for j in range(num_four_strokes.astype(int)):
         results = four_stroke(pressure[-1], temperature[-1], rps, v, ct)
+        # print(results[0])
         pressure[-1] = results[1]
         temperature[-1] = results[0]
     results = four_stroke(pressure[-1], temperature[-1], rps, v, ct)
@@ -219,8 +214,13 @@ for i in range(time.size - 1):
 
 for i in range(len(temperature)):
     temperature[i] -= 273
-plt.plot(time, temperature)
-plt.plot(time, coolant_temps)
+plt.plot(time, temperature, label='Simulated Temperature')
+plt.plot(time, coolant_temps, label='Coolant Temperature')
+plt.plot(time, oil_temps, label='Oil Temperature')
+plt.xlabel("Time (s)")
+plt.ylabel("Temperature (C)")
+plt.title("Engine Temperature Over Time")
+plt.legend()
 plt.show()
 
 

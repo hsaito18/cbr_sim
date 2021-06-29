@@ -1,7 +1,16 @@
+"""
+Four stroke engine cycle simulator created for PHYS 203 final project. Uses simple cooling model to
+track temperature increease over time in a race.
+Uses "track_data2.csv" that contains RPM, coolant temperature, and oil temperature data.
+
+Author: Henrique Saito
+"""
+
 import matplotlib.pyplot as plt
 import math
 import pandas as pd
 
+# Constants
 OPTIMAL_AIR_FUEL_RATIO = 14.7
 OCTANE_MOLAR_MASS = 114.23
 AIR_MOLAR_MASS = 28.97
@@ -21,52 +30,38 @@ ENGINE_HEAT_CAPACITY = 910
 ENGINE_K = 230
 ENGINE_THICKNESS = 0.02
 
-
-
+"""
+Kinematics of piston and crankshaft. Just to plot the P-V graph in the correct shape.
+Largely inspired by https://skill-lync.com/projects/otto-cycle-simulator-using-python-8\
+"""
 def engine_kinematics(bore, stroke, con_rod, cr, start_crank, end_crank):
-    """
-    Engine Kinematics
-    """
     # geometric parameters
-    a = stroke / 2
-    R = con_rod / a
+    r = con_rod / (stroke / 2)
 
     # volume
     v_s = (math.pi) / 4 * pow(bore, 2) * stroke
     v_c = v_s / (cr - 1)
-
     sc = math.radians(start_crank)
     ec = math.radians(end_crank)
-
     n_theta = 100
-
     dtheta = (ec - sc) / (n_theta - 1)
-
-    V = []
-
-    for i in range(0, n_theta):
-        theta = sc + (i * dtheta)
+    vol = []
+    for k in range(0, n_theta):
+        theta = sc + (k * dtheta)
         term1 = 0.5 * (cr - 1)
-        term2 = R + 1 - math.cos(theta)
-        term3 = pow(pow(R, 2) - pow(math.sin(theta), 2), 0.5)
+        term2 = r + 1 - math.cos(theta)
+        term3 = pow(pow(r, 2) - pow(math.sin(theta), 2), 0.5)
+        vol.append((1 + term1 * (term2 - term3)) * v_c)
+    return vol
 
-        V.append((1 + term1 * (term2 - term3)) * v_c)
-
-    return V
-
-
+"""
+Simulate one four stroke engine cycle, and return the final engine temperature.
+Some ideal-gas elements were inspired by https://skill-lync.com/student-projects/otto-cycle-simulator-using-python-8
+"""
 def four_stroke(p1, t1, rps, speed, cool_temp):
-    """
-    # input parameters
-    p1 = 101325
-    t1 = 300
-    """
     if rps == 0:
         return [t1, p1]
     time_diff = 1.0 / rps
-
-    engine_temp = t1
-
     gamma = 7.0 / 5.0
     # geometric parameters
     bore = 0.067
@@ -79,7 +74,6 @@ def four_stroke(p1, t1, rps, speed, cool_temp):
     v_c = v_s / (cr - 1)
     v1 = v_s + v_c
     v2 = v_c
-
     sa = 2 * math.pi / 4 * bore ** 2 * math.pi * bore * stroke / 2
 
     # number of moles of air
@@ -95,16 +89,7 @@ def four_stroke(p1, t1, rps, speed, cool_temp):
 
     # temperature lost due to cooling from Newton's law of cooling
     t2 = (t2n2 * n_n2 + t2o2 * n_o2) / (n_n2 + n_o2)
-    """
-    t21 = (t2 + t1) / 2
-    hc = 100000
-    tau = ENGINE_MASS * ENGINE_HEAT_CAPACITY / (hc * sa)
-    t2c = cool_temp + (t21 - cool_temp) * math.exp(-time_diff / (2*tau))
-    temp_cooled_21 = t21 - t2c
-    t2 -= temp_cooled_21
-    heat_transfer_21 = temp_cooled_21 * AIR_C
-    engine_temp += heat_transfer_21 / (ENGINE_MASS * ENGINE_HEAT_CAPACITY)
-    """
+
     p2n2 = n_n2 * R * t2 / (v2 - n_n2 * b) - a * n_n2 ** 2 / (v2 ** 2)
     p2o2 = n_o2 * R * t2 / (v2 - n_o2 * bo2) - ao2 * n_o2 ** 2 / (v2 ** 2)
     p2 = p2n2 + p2o2
@@ -128,12 +113,12 @@ def four_stroke(p1, t1, rps, speed, cool_temp):
     t3 = (t3n2 * num_moles_n2 + t3co2 * num_moles_co2) / (num_moles_n2 + num_moles_co2)
 
     # 3 -> 4
-    V_compression = engine_kinematics(bore, stroke, con_rod, cr, 180, 0)
+    v_compression = engine_kinematics(bore, stroke, con_rod, cr, 180, 0)
     constant = p1 * pow(v1, gamma)
 
-    P_compression = []
-    for v in V_compression:
-        P_compression.append(constant / pow(v, gamma))
+    p_compression = []
+    for v in v_compression:
+        p_compression.append(constant / pow(v, gamma))
     # state3
     v3 = v2
 
@@ -141,29 +126,19 @@ def four_stroke(p1, t1, rps, speed, cool_temp):
     rhs = p2 * v2 / t2
     p3 = rhs * t3 / v3
 
-    V_expansion = engine_kinematics(bore, stroke, con_rod, cr, 0, 180)
+    v_expansion = engine_kinematics(bore, stroke, con_rod, cr, 0, 180)
 
     constant = p3 * pow(v3, gamma)
-    # P_expansion*V_expansion^gamma=constant
 
-    P_expansion = []
-    for v in V_expansion:
-        P_expansion.append(constant / pow(v, gamma))
+    p_expansion = []
+    for v in v_expansion:
+        p_expansion.append(constant / pow(v, gamma))
 
     # 4 -> 1
     v4 = v1
     t4n = t3 * ((v3 - num_moles_n2 * b) / (v4 - num_moles_n2 * b)) ** (2.0 / 5.0)
     t4c = t3 * ((v3 - num_moles_co2 * bco2) / (v4 - num_moles_co2 * bco2)) ** (2.0 / 5.0)
     t4 = (t4n * num_moles_n2 + t4c * num_moles_co2) / (num_moles_n2 + num_moles_co2)
-
-    """
-    t43 = (t4+t3)/2
-    t4c = cool_temp + (t43 - cool_temp)*math.exp(-time_diff/(2*tau))
-    temp_cooled_43 = t43-t4c
-    t4 -= temp_cooled_43
-    heat_transfer_43 = temp_cooled_43 * AIR_C
-    engine_temp += heat_transfer_43 / (ENGINE_MASS * ENGINE_HEAT_CAPACITY)
-    """
 
     mean_temp = ((t1 + t2)/2 * 0.5 + (t3+t3)/2 * 0.5 + (t4+t1)/2 * 0.5 + t1*0.5)/2
     q = ENGINE_K * sa * (mean_temp-cool_temp) / ENGINE_THICKNESS
@@ -177,8 +152,8 @@ def four_stroke(p1, t1, rps, speed, cool_temp):
     """
     # plot
     plt.plot([v2, v3], [p2, p3])
-    plt.plot(V_compression, P_compression)
-    plt.plot(V_expansion, P_expansion)
+    plt.plot(v_compression, p_compression)
+    plt.plot(v_expansion, p_expansion)
     plt.plot([v4, v1], [p4, p1])
     plt.xlabel('Volume (cubic meters)')
     plt.ylabel('Pressure (Pa)')
